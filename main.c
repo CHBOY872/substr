@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #define BUFLEN 256
 
@@ -33,7 +35,7 @@ void mem_move(char *dst, const char *src, int len)
         dst[i] = src[i];
 }
 
-int find_substring(FILE *f, const char *pattern)
+int find_substring(int fd, const char *pattern)
 {
     int res = 0;
     int pattern_len = str_len(pattern);
@@ -41,7 +43,7 @@ int find_substring(FILE *f, const char *pattern)
     int read_at_end = 1;
     char* inter_buf = malloc(pattern_len * 2 - 1);
     char* main_buf = malloc(BUFLEN + 1);
-    while ((read_len = fread(main_buf, sizeof(char), BUFLEN, f)) != 0) {
+    while ((read_len = read(fd, main_buf, BUFLEN)) > 0) {
         main_buf[read_len] = 0;
         int len = read_len > pattern_len - 1 ? pattern_len - 1 : read_len;
         if (read_at_end) {
@@ -64,9 +66,9 @@ int find_substring(FILE *f, const char *pattern)
             tmp += pattern_len;
         }
     }
-    if (ferror(f)) {
+    if (fd < 0) {
         fprintf(stderr, "error while reading file\n");
-        perror("fread");
+        perror("read");
     }
     free(inter_buf);
     free(main_buf);
@@ -80,15 +82,15 @@ int main(int argc, const char** argv)
         return 1;
     }
 
-    FILE *f;
-    f = fopen(argv[2], "r");
-    if (!f) {
+    int fd;
+    fd = open(argv[2], O_RDONLY, 0777);
+    if (fd == -1) {
         fprintf(stderr, "unable to open a file\n");
-        perror("fopen");
+        perror("open");
         return 2;
     }
-    int res = find_substring(f, argv[1]);
-    fclose(f);
+    int res = find_substring(fd, argv[1]);
+    close(fd);
     /*
         process arguments
         usage: [args] <pattern> [file]
